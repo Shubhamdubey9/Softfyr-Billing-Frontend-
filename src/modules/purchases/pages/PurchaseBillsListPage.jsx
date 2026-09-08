@@ -68,18 +68,23 @@ const PurchaseBillsListPage = () => {
   const allBills = rawBills;
 
   const filteredBills = allBills.filter((bill) => {
-    const billNo = (bill.purchaseNumber || bill.supplierInvoiceNumber || '').toLowerCase();
-    const supName = (bill.supplier?.name || bill.supplierName || '').toLowerCase();
+    const billNo = (bill.purchaseNumber || bill.supplierInvoiceNumber || bill.purchaseOrderNumber || '').toLowerCase();
+    const supName = (bill.supplier?.name || bill.supplierName || bill.supplier?.companyName || '').toLowerCase();
     const query = searchQuery.trim().toLowerCase();
 
     if (query && !billNo.includes(query) && !supName.includes(query)) return false;
-    if (statusFilter !== 'ALL' && String(bill.status).toUpperCase() !== statusFilter) return false;
+    if (statusFilter !== 'ALL' && String(bill.status || bill.purchaseStatus).toUpperCase() !== statusFilter) return false;
     if (paymentStatusFilter !== 'ALL' && String(bill.paymentStatus).toUpperCase() !== paymentStatusFilter) return false;
     if (supplierFilter !== 'ALL' && bill.supplier?.id !== supplierFilter && bill.supplierId !== supplierFilter) return false;
 
     if (activeTab !== 'ALL') {
-      if (activeTab === 'OVERDUE' && !bill.isOverdue) return false;
-      if (activeTab !== 'OVERDUE' && String(bill.paymentStatus).toUpperCase() !== activeTab && String(bill.status).toUpperCase() !== activeTab) {
+      const isOverdue = Boolean(
+        bill.isOverdue ||
+        (bill.dueDate && new Date(bill.dueDate) < new Date() && String(bill.paymentStatus).toUpperCase() !== 'PAID')
+      );
+      if (activeTab === 'OVERDUE' && !isOverdue) return false;
+      if (activeTab === 'PARTIAL' && !['PARTIAL', 'PARTIALLY_PAID'].includes(String(bill.paymentStatus).toUpperCase())) return false;
+      if (activeTab !== 'OVERDUE' && activeTab !== 'PARTIAL' && String(bill.paymentStatus).toUpperCase() !== activeTab && String(bill.status || bill.purchaseStatus).toUpperCase() !== activeTab) {
         return false;
       }
     }
@@ -96,12 +101,49 @@ const PurchaseBillsListPage = () => {
 
   const summary = responseData?.summary || responseData?.data?.summary || {};
 
-  // Metrics
-  const totalBills = summary.totalBills ?? allBills.length;
-  const totalAmount = summary.totalAmount ?? allBills.reduce((acc, b) => acc + (b.totalAmount || 0), 0);
-  const paidAmount = summary.totalPaid ?? allBills.reduce((acc, b) => acc + (b.paidAmount || 0), 0);
-  const dueAmount = summary.totalDue ?? allBills.reduce((acc, b) => acc + (b.dueAmount || 0), 0);
-  const overdueAmount = summary.overdueAmount ?? allBills.filter(b => b.isOverdue).reduce((acc, b) => acc + (b.dueAmount || 0), 0);
+  // Metrics with safe type casting & backend property fallback options
+  const totalBills = Number(summary.totalBills ?? summary.totalCount ?? summary.count ?? pagination.total ?? allBills.length) || 0;
+
+  const totalAmount = Number(
+    summary.totalAmount ??
+    summary.totalPurchaseAmount ??
+    summary.totalSum ??
+    allBills.reduce((acc, b) => acc + (Number(b.totalAmount) || 0), 0)
+  ) || 0;
+
+  const paidAmount = Number(
+    summary.totalPaid ??
+    summary.totalPaidAmount ??
+    summary.paidAmount ??
+    allBills.reduce((acc, b) => acc + (Number(b.paidAmount) || 0), 0)
+  ) || 0;
+
+  const dueAmount = Number(
+    summary.totalDue ??
+    summary.totalDueAmount ??
+    summary.dueAmount ??
+    summary.totalOutstanding ??
+    allBills.reduce((acc, b) => {
+      const bTotal = Number(b.totalAmount) || 0;
+      const bPaid = Number(b.paidAmount) || 0;
+      const bDue = b.dueAmount !== undefined && b.dueAmount !== null ? Number(b.dueAmount) : Math.max(0, bTotal - bPaid);
+      return acc + bDue;
+    }, 0)
+  ) || 0;
+
+  const overdueAmount = Number(
+    summary.overdueAmount ??
+    summary.totalOverdue ??
+    summary.overdue ??
+    allBills
+      .filter((b) => Boolean(b.isOverdue || (b.dueDate && new Date(b.dueDate) < new Date() && String(b.paymentStatus).toUpperCase() !== 'PAID')))
+      .reduce((acc, b) => {
+        const bTotal = Number(b.totalAmount) || 0;
+        const bPaid = Number(b.paidAmount) || 0;
+        const bDue = b.dueAmount !== undefined && b.dueAmount !== null ? Number(b.dueAmount) : Math.max(0, bTotal - bPaid);
+        return acc + bDue;
+      }, 0)
+  ) || 0;
 
   const handleExport = async (format = 'csv') => {
     try {
@@ -191,6 +233,10 @@ const PurchaseBillsListPage = () => {
         paidAmount={paidAmount}
         dueAmount={dueAmount}
         overdueAmount={overdueAmount}
+        onSelectTab={(tab) => {
+          setActiveTab(tab);
+          setCurrentPage(1);
+        }}
       />
 
       {/* Filter & Search Bar Sub-Component */}
@@ -231,11 +277,11 @@ const PurchaseBillsListPage = () => {
           toast.info('Filters reset.');
         }}
         totalBillsCount={totalBills}
-        paidCount={rawBills.filter(b => b.paymentStatus === 'PAID').length}
-        partialCount={rawBills.filter(b => b.paymentStatus === 'PARTIAL').length}
-        unpaidCount={rawBills.filter(b => b.paymentStatus === 'UNPAID').length}
-        overdueCount={rawBills.filter(b => b.isOverdue).length}
-        cancelledCount={rawBills.filter(b => b.status === 'CANCELLED').length}
+        paidCount={allBills.filter(b => String(b.paymentStatus).toUpperCase() === 'PAID').length}
+        partialCount={allBills.filter(b => ['PARTIAL', 'PARTIALLY_PAID'].includes(String(b.paymentStatus).toUpperCase())).length}
+        unpaidCount={allBills.filter(b => ['UNPAID', 'PENDING'].includes(String(b.paymentStatus).toUpperCase())).length}
+        overdueCount={allBills.filter(b => Boolean(b.isOverdue || (b.dueDate && new Date(b.dueDate) < new Date() && String(b.paymentStatus).toUpperCase() !== 'PAID'))).length}
+        cancelledCount={allBills.filter(b => ['CANCELLED', 'CANCELED'].includes(String(b.status || b.purchaseStatus).toUpperCase())).length}
       />
 
       {/* Main Data Table Card */}

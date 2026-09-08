@@ -1,5 +1,4 @@
-import React from 'react';
-import { Info, Upload, QrCode, Calendar, Layers } from 'lucide-react';
+import { Info, Upload, QrCode, Calendar, Layers, Settings } from 'lucide-react';
 
 const ProductBasicInfoCard = ({
   formData,
@@ -46,17 +45,58 @@ const ProductBasicInfoCard = ({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block mb-1 uppercase text-[11px] font-extrabold text-slate-700">
-              SKU <span className="text-slate-400 font-normal text-[10px] normal-case ml-1">(Optional - Auto Generated if Empty)</span>
-            </label>
-            <input
-              type="text"
-              name="sku"
-              value={formData.sku || ''}
-              onChange={onInputChange}
-              placeholder="Enter SKU or leave blank"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            />
+            <div className="flex items-center justify-between mb-1">
+              <label className="block uppercase text-[11px] font-extrabold text-slate-700">
+                SKU <span className="text-slate-400 font-normal text-[10px] normal-case ml-1">(Stock Keeping Unit)</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  let prefix = 'SKU';
+                  if (formData.name && formData.name.trim()) {
+                    const words = formData.name.trim().split(/\s+/);
+                    const initials = words.map(w => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+                    if (initials.length >= 2) prefix = `SKU-${initials}`;
+                  }
+                  const randomNum = Math.floor(100000 + Math.random() * 900000);
+                  const generatedSku = `${prefix}-${randomNum}`;
+                  onInputChange({ target: { name: 'sku', value: generatedSku } });
+                }}
+                className="text-[11px] text-indigo-600 font-extrabold hover:underline cursor-pointer flex items-center gap-1"
+                title="Auto Generate SKU"
+              >
+                <Settings size={13} className="text-indigo-600 animate-spin-slow" />
+                <span>Auto Generate SKU</span>
+              </button>
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                name="sku"
+                value={formData.sku || ''}
+                onChange={onInputChange}
+                placeholder="Enter SKU or click settings icon to generate"
+                className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-mono text-slate-900 font-bold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  let prefix = 'SKU';
+                  if (formData.name && formData.name.trim()) {
+                    const words = formData.name.trim().split(/\s+/);
+                    const initials = words.map(w => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
+                    if (initials.length >= 2) prefix = `SKU-${initials}`;
+                  }
+                  const randomNum = Math.floor(100000 + Math.random() * 900000);
+                  const generatedSku = `${prefix}-${randomNum}`;
+                  onInputChange({ target: { name: 'sku', value: generatedSku } });
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                title="Click to Auto-generate SKU"
+              >
+                <Settings size={16} />
+              </button>
+            </div>
           </div>
 
           <div className="sm:col-span-2">
@@ -217,7 +257,7 @@ const ProductBasicInfoCard = ({
           <div>
             <label className="block mb-1 uppercase text-[11px] font-extrabold text-slate-700 flex items-center justify-between">
               <span>Opening Quantity</span>
-              <span className="text-[10px] text-indigo-600 font-extrabold">(How many {formData.unit || 'Pcs'}?)</span>
+              <span className="text-[10px] text-indigo-600 font-extrabold">(Initial Stock)</span>
             </label>
             <div className="relative">
               <input
@@ -227,6 +267,27 @@ const ProductBasicInfoCard = ({
                 value={formData.openingStock ?? ''}
                 onChange={onInputChange}
                 placeholder={`0 ${formData.unit || 'Nos'}`}
+                className="w-full pl-3.5 pr-14 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-extrabold text-xs">
+                {formData.unit || 'Nos'}
+              </span>
+            </div>
+          </div>
+
+          <div>
+            <label className="block mb-1 uppercase text-[11px] font-extrabold text-slate-700 flex items-center justify-between">
+              <span>Low Stock Alert Limit</span>
+              <span className="text-[10px] text-amber-600 font-extrabold">(Alert Limit)</span>
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                name="minStockLevel"
+                min="0"
+                value={formData.minStockLevel ?? ''}
+                onChange={onInputChange}
+                placeholder="e.g. 5"
                 className="w-full pl-3.5 pr-14 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-extrabold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 font-extrabold text-xs">

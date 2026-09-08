@@ -13,7 +13,6 @@ import { useToast } from '../../../context/ToastContext';
 // Sub-components
 import ProductBasicInfoCard from '../components/ProductBasicInfoCard';
 import ProductPricingTaxCard from '../components/ProductPricingTaxCard';
-import ProductInventoryCard from '../components/ProductInventoryCard';
 import ProductStatusCard from '../components/ProductStatusCard';
 import ProductDeleteModal from '../components/ProductDeleteModal';
 
@@ -223,6 +222,7 @@ const CreateProductPage = () => {
       secondaryPurchasePrice: formData.hasSecondaryUnit ? (Number(formData.secondaryPurchasePrice) || 0) : null,
       taxType: computedTaxType,
       taxMode: formData.taxMode || 'EXCLUSIVE',
+      isTaxInclusive: formData.taxMode === 'INCLUSIVE',
       hsnCode: formData.hsnCode || '',
       hsn: formData.hsnCode || '',
       sku: finalSku,
@@ -232,6 +232,7 @@ const CreateProductPage = () => {
       mrp: Number(formData.mrp) || Number(formData.sellingPrice) || 0,
       discountPercent: Number(formData.discountPercent) || 0,
       taxPercent: (formData.taxType === 'EXEMPT' || formData.taxType === 'NON_GST') ? 0 : (Number(formData.taxPercent) || 0),
+      taxRate: (formData.taxType === 'EXEMPT' || formData.taxType === 'NON_GST') ? 0 : (Number(formData.taxPercent) || 0),
       currentStock: Number(formData.openingStock) || 0,
       openingStock: Number(formData.openingStock) || 0,
       maxStockLevel: Number(formData.maxStockLevel) || 0,
@@ -366,7 +367,6 @@ const CreateProductPage = () => {
         {[
           { id: 'basic', label: 'Basic Information' },
           { id: 'pricing', label: 'Pricing & Tax' },
-          { id: 'inventory', label: 'Inventory' },
           { id: 'status', label: 'Other Details' },
         ].map((tab) => (
           <button
@@ -400,10 +400,7 @@ const CreateProductPage = () => {
         {/* Section 2: Pricing & Tax */}
         <ProductPricingTaxCard formData={formData} onInputChange={handleInputChange} />
 
-        {/* Section 3: Inventory Information */}
-        <ProductInventoryCard formData={formData} onInputChange={handleInputChange} />
-
-        {/* Section 4: Product Status */}
+        {/* Section 3: Product Status */}
         <ProductStatusCard
           status={formData.status}
           onStatusChange={(st) => setFormData((prev) => ({ ...prev, status: st }))}

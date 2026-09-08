@@ -21,10 +21,18 @@ const BillsListPage = () => {
 
   const billsList = Array.isArray(rawBills)
     ? rawBills
+    : Array.isArray(rawBills?.data?.items)
+    ? rawBills.data.items
+    : Array.isArray(rawBills?.data?.invoices)
+    ? rawBills.data.invoices
+    : Array.isArray(rawBills?.data?.bills)
+    ? rawBills.data.bills
     : Array.isArray(rawBills?.bills)
     ? rawBills.bills
     : Array.isArray(rawBills?.items)
     ? rawBills.items
+    : Array.isArray(rawBills?.data)
+    ? rawBills.data
     : [];
 
   const filteredBills = billsList.filter((bill) => {

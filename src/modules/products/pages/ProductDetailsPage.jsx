@@ -90,29 +90,38 @@ const ProductDetailsPage = () => {
   const taxPercent = Number(product.taxPercent ?? product.taxRate ?? product.tax?.percentage) || 0;
   const discountPercent = Number(product.discountPercent) || 0;
   const currentStock = Number(product.currentStock) || 0;
-  const minStockLevel = Number(product.minStockLevel) || 0;
+  const minStockLevel = Number(product.minStockLevel ?? product.stockAlertQuantity ?? product.minStock ?? product.lowStockThreshold ?? 5);
 
   const isInclusive = (product.taxType || product.taxMode || '').toUpperCase() === 'INCLUSIVE';
   const effectiveSellingPrice = discountPercent > 0 ? sellingPrice - (sellingPrice * discountPercent) / 100 : sellingPrice;
-  let taxableValue = effectiveSellingPrice;
+
+  // Tax-Deducted Base Prices (Pricing & Tax Engine Alignment)
+  let basePurchasePrice = purchasePrice;
+  if (purchasePrice > 0 && taxPercent > 0 && isInclusive) {
+    basePurchasePrice = purchasePrice / (1 + taxPercent / 100);
+  }
+
+  let baseSellingPrice = effectiveSellingPrice;
   let totalTaxAmount = 0;
   let finalPriceWithTax = effectiveSellingPrice;
 
   if (isInclusive) {
-    taxableValue = taxPercent > 0 ? effectiveSellingPrice / (1 + taxPercent / 100) : effectiveSellingPrice;
-    totalTaxAmount = effectiveSellingPrice - taxableValue;
+    baseSellingPrice = taxPercent > 0 ? effectiveSellingPrice / (1 + taxPercent / 100) : effectiveSellingPrice;
+    totalTaxAmount = effectiveSellingPrice - baseSellingPrice;
     finalPriceWithTax = effectiveSellingPrice;
   } else {
-    taxableValue = effectiveSellingPrice;
+    baseSellingPrice = effectiveSellingPrice;
     totalTaxAmount = taxPercent > 0 ? (effectiveSellingPrice * taxPercent) / 100 : 0;
     finalPriceWithTax = effectiveSellingPrice + totalTaxAmount;
   }
 
+  const taxableValue = baseSellingPrice;
   const cgstAmount = totalTaxAmount / 2;
   const sgstAmount = totalTaxAmount / 2;
 
-  const profitAmount = finalPriceWithTax - purchasePrice;
-  const profitMarginPercent = purchasePrice > 0 ? ((profitAmount / purchasePrice) * 100).toFixed(2) : 0;
+  // Tax-Deducted Real Net Profit (Base Selling Price - Base Purchase Price)
+  const profitAmount = (baseSellingPrice > 0 && basePurchasePrice > 0) ? baseSellingPrice - basePurchasePrice : (sellingPrice - purchasePrice);
+  const profitMarginPercent = basePurchasePrice > 0 ? ((profitAmount / basePurchasePrice) * 100).toFixed(2) : '0.00';
 
   // Resolve Image URL
   let imgSrc = product.imageUrl || product.productImage || product.image || product.thumbnail || product.photo || product.img || null;
@@ -131,7 +140,7 @@ const ProductDetailsPage = () => {
         </span>
       );
     }
-    if (currentStock <= (minStockLevel || 10) || statusStr === 'LOW_STOCK') {
+    if ((currentStock > 0 && currentStock <= minStockLevel) || statusStr === 'LOW_STOCK') {
       return (
         <span className="px-2.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-full font-extrabold text-[11px] flex items-center gap-1">
           <AlertTriangle size={12} /> Low Stock ({currentStock})

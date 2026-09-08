@@ -25,8 +25,14 @@ const CreateBillPOSPage = () => {
 
   const productsList = Array.isArray(rawProducts)
     ? rawProducts
+    : Array.isArray(rawProducts?.data?.items)
+    ? rawProducts.data.items
+    : Array.isArray(rawProducts?.data?.products)
+    ? rawProducts.data.products
     : Array.isArray(rawProducts?.items)
     ? rawProducts.items
+    : Array.isArray(rawProducts?.data)
+    ? rawProducts.data
     : [];
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -46,7 +52,8 @@ const CreateBillPOSPage = () => {
           item.id === product.id ? { ...item, qty: item.qty + 1 } : item
         );
       }
-      const priceNum = typeof product.price === 'number' ? product.price : parseFloat((product.price || '0').replace(/[^0-9.]/g, '')) || 500;
+      const rawPrice = product.sellingPrice ?? product.price ?? 0;
+      const priceNum = typeof rawPrice === 'number' ? rawPrice : (parseFloat(String(rawPrice).replace(/[^0-9.]/g, '')) || 0);
       return [...prev, { ...product, qty: 1, numericPrice: priceNum }];
     });
   };

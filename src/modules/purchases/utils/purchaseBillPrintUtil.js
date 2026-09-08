@@ -232,11 +232,43 @@ async function buildPurchaseBillPdfDoc(bill, tenantInfo) {
     const discPercent = parseNum(item.discountPercent ?? item.discount ?? item.discPercent ?? item.disc, 0);
     const gstRate = parseNum(item.taxPercent ?? item.taxRate ?? item.gstPercent ?? item.gstRate ?? item.gst ?? item.tax, 0);
 
-    const isInclusive = (item.taxMode || item.taxType || item.product?.taxMode || item.product?.taxType || '').toUpperCase() === 'INCLUSIVE';
+    const explicitTaxMode = String(
+      item.taxMode ||
+      item.taxType ||
+      item.tax_mode ||
+      item.tax_type ||
+      (item.isTaxInclusive || item.is_tax_inclusive ? 'INCLUSIVE' : '') ||
+      item.product?.taxMode ||
+      item.product?.taxType ||
+      item.product?.tax_mode ||
+      item.product?.tax_type ||
+      (item.product?.isTaxInclusive || item.product?.is_tax_inclusive ? 'INCLUSIVE' : '') ||
+      ''
+    ).toUpperCase();
+
     const grossAmount = qty * rate;
     const discAmount = grossAmount * (discPercent / 100);
     const netAmount = grossAmount - discAmount;
     const netRate = rate * (1 - discPercent / 100);
+    const rawTotal = parseNum(item.totalAmount ?? item.amount ?? item.total, 0);
+
+    let isInclusive = false;
+    if (['INCLUSIVE', 'GST_INCLUSIVE', 'INCL', 'TRUE'].includes(explicitTaxMode)) {
+      isInclusive = true;
+    } else if (['EXCLUSIVE', 'GST_EXCLUSIVE', 'EXCL', 'FALSE'].includes(explicitTaxMode)) {
+      isInclusive = false;
+    } else if (rawTotal > 0 && gstRate > 0) {
+      const exclCalculated = netAmount * (1 + gstRate / 100);
+      if (Math.abs(rawTotal - netAmount) <= Math.abs(rawTotal - exclCalculated)) {
+        isInclusive = true;
+      }
+    } else if (activeBill?.totalAmount > 0 && gstRate > 0 && rawItems.length === 1) {
+      const billTotal = parseNum(activeBill.totalAmount, 0);
+      const exclCalculated = netAmount * (1 + gstRate / 100);
+      if (Math.abs(billTotal - netAmount) <= Math.abs(billTotal - exclCalculated)) {
+        isInclusive = true;
+      }
+    }
 
     let taxableAmount = netAmount;
     let taxAmount = netAmount * (gstRate / 100);

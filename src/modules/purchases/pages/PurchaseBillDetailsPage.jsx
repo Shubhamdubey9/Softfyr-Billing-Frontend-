@@ -296,14 +296,30 @@ const PurchaseBillDetailsPage = () => {
           const rawTotal = Number(item.totalAmount || item.amount || 0);
           const net = qty * price * (1 - discPct / 100);
 
-          const explicitTaxMode = (item.taxMode || item.taxType || item.product?.taxMode || item.product?.taxType || '').toUpperCase();
+          const explicitTaxMode = String(
+            item.taxMode ||
+            item.taxType ||
+            item.tax_mode ||
+            item.tax_type ||
+            (item.isTaxInclusive || item.is_tax_inclusive ? 'INCLUSIVE' : '') ||
+            item.product?.taxMode ||
+            item.product?.taxType ||
+            item.product?.tax_mode ||
+            item.product?.tax_type ||
+            (item.product?.isTaxInclusive || item.product?.is_tax_inclusive ? 'INCLUSIVE' : '') ||
+            ''
+          ).toUpperCase();
+
           let isInclusive = false;
-          if (explicitTaxMode === 'INCLUSIVE' || explicitTaxMode === 'GST_INCLUSIVE') {
+          if (['INCLUSIVE', 'GST_INCLUSIVE', 'INCL', 'TRUE'].includes(explicitTaxMode)) {
             isInclusive = true;
-          } else if (explicitTaxMode === 'EXCLUSIVE') {
+          } else if (['EXCLUSIVE', 'GST_EXCLUSIVE', 'EXCL', 'FALSE'].includes(explicitTaxMode)) {
             isInclusive = false;
-          } else if (rawTotal > 0 && taxRate > 0 && Math.abs(rawTotal - net) < Math.abs(rawTotal - net * (1 + taxRate / 100))) {
-            isInclusive = true;
+          } else if (rawTotal > 0 && taxRate > 0) {
+            const exclCalculated = net * (1 + taxRate / 100);
+            if (Math.abs(rawTotal - net) <= Math.abs(rawTotal - exclCalculated)) {
+              isInclusive = true;
+            }
           }
 
           const taxMode = isInclusive ? 'INCLUSIVE' : 'EXCLUSIVE';
@@ -624,7 +640,12 @@ const PurchaseBillDetailsPage = () => {
                       <td className="py-3 px-3 text-center font-mono text-[11px] text-slate-600">{item.hsn}</td>
                       <td className="py-3 px-3 text-center font-black text-slate-900">{item.quantity}</td>
                       <td className="py-3 px-3 text-right font-bold text-slate-900">₹{(item.purchasePrice || 0).toLocaleString('en-IN')}.00</td>
-                      <td className="py-3 px-3 text-center text-slate-600">{item.taxRate}%</td>
+                      <td className="py-3 px-3 text-center text-slate-600">
+                        <div>{item.taxRate}%</div>
+                        {item.taxMode === 'INCLUSIVE' && (
+                          <span className="text-[10px] text-emerald-600 font-extrabold block">(Incl.)</span>
+                        )}
+                      </td>
                       <td className="py-3 px-3 text-right font-black text-slate-900">₹{(item.amount || 0).toLocaleString('en-IN')}.00</td>
                     </tr>
                   ))}

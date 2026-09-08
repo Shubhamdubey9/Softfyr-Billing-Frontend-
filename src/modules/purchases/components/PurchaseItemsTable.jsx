@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Search, Plus, Barcode, Trash2, Upload, Package } from 'lucide-react';
 
 const PurchaseItemsTable = ({
@@ -18,6 +18,30 @@ const PurchaseItemsTable = ({
   totalItemsCount,
   totalQuantityCount,
 }) => {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const searchContainerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const queryLower = (productSearchQuery || '').trim().toLowerCase();
+  const matches = queryLower
+    ? products.filter(
+        (p) =>
+          p.name.toLowerCase().includes(queryLower) ||
+          (p.sku && p.sku.toLowerCase().includes(queryLower)) ||
+          (p.barcode && p.barcode.includes(queryLower)) ||
+          ((p.hsnCode || p.hsn) && (p.hsnCode || p.hsn).toLowerCase().includes(queryLower))
+      )
+    : products;
+
   return (
     <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-sm space-y-5">
       {/* Simple Header */}
@@ -31,64 +55,77 @@ const PurchaseItemsTable = ({
 
       {/* Product Autocomplete Bar & Action Buttons */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
-        <div className="relative w-full sm:flex-1">
+        <div className="relative w-full sm:flex-1" ref={searchContainerRef}>
           <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Search product by name, SKU, HSN code or barcode..."
+            placeholder="Click to view all products or search by name, SKU, HSN code..."
             value={productSearchQuery}
-            onChange={(e) => onProductSearchChange(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            onFocus={() => setIsDropdownOpen(true)}
+            onChange={(e) => {
+              onProductSearchChange(e.target.value);
+              setIsDropdownOpen(true);
+            }}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
           />
 
           {/* Autocomplete Dropdown */}
-          {productSearchQuery.trim() && (
-            <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-2xl shadow-xl z-30 max-h-64 overflow-y-auto divide-y divide-slate-100">
-              {(() => {
-                const matches = products.filter(
-                  (p) =>
-                    p.name.toLowerCase().includes(productSearchQuery.toLowerCase()) ||
-                    (p.sku && p.sku.toLowerCase().includes(productSearchQuery.toLowerCase())) ||
-                    (p.barcode && p.barcode.includes(productSearchQuery)) ||
-                    ((p.hsnCode || p.hsn) && (p.hsnCode || p.hsn).toLowerCase().includes(productSearchQuery.toLowerCase()))
-                );
+          {isDropdownOpen && (
+            <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-2xl shadow-2xl z-30 max-h-80 overflow-y-auto divide-y divide-slate-100 animate-fadeIn">
+              <div className="px-3.5 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between text-[11px] font-extrabold text-slate-500 sticky top-0 z-10 backdrop-blur-md">
+                <span>{queryLower ? `Search Results (${matches.length})` : `All Catalog Products (${products.length})`}</span>
+                <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full text-[10px]">
+                  {matches.length} {matches.length === 1 ? 'product' : 'products'} available
+                </span>
+              </div>
 
-                if (matches.length === 0) {
-                  return (
-                    <div className="p-4 text-center space-y-2">
-                      <div className="text-xs font-bold text-slate-600">
-                        No product matching <span className="text-indigo-600 font-extrabold">"{productSearchQuery}"</span> in Catalog.
-                      </div>
-                      <button
-                        type="button"
-                        onClick={onOpenProductModal}
-                        className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
-                      >
-                        <Plus size={14} />
-                        <span>Add "{productSearchQuery}" to Product Catalog</span>
-                      </button>
-                    </div>
-                  );
-                }
-
-                return matches.slice(0, 5).map((product) => (
+              {matches.length === 0 ? (
+                <div className="p-4 text-center space-y-2">
+                  <div className="text-xs font-bold text-slate-600">
+                    No product matching <span className="text-indigo-600 font-extrabold">"{productSearchQuery}"</span> in Catalog.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDropdownOpen(false);
+                      onOpenProductModal();
+                    }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Plus size={14} />
+                    <span>Add "{productSearchQuery}" to Product Catalog</span>
+                  </button>
+                </div>
+              ) : (
+                matches.map((product) => (
                   <div
-                    key={product.id}
-                    onClick={() => onSelectProduct(product)}
-                    className="p-3 hover:bg-indigo-50/70 cursor-pointer flex items-center justify-between text-xs transition-colors"
+                    key={product.id || product._id}
+                    onClick={() => {
+                      onSelectProduct(product);
+                      setIsDropdownOpen(false);
+                    }}
+                    className="p-3 hover:bg-indigo-50/70 cursor-pointer flex items-center justify-between text-xs transition-colors group"
                   >
                     <div>
-                      <div className="font-extrabold text-slate-900">{product.name}</div>
-                      <div className="text-[11px] text-slate-500 font-mono">
-                        SKU: {product.sku || 'N/A'} | <span className="text-indigo-600 font-bold">HSN: {product.hsnCode || product.hsn || 'N/A'}</span> | BC: {product.barcode || 'N/A'}
+                      <div className="font-extrabold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                        {product.name}
+                      </div>
+                      <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                        SKU: {product.sku || 'N/A'} | <span className="text-indigo-600 font-bold">HSN: {product.hsnCode || product.hsn || 'N/A'}</span>
+                        {product.unit ? ` | Unit: ${product.unit}` : ''}
                       </div>
                     </div>
-                    <div className="font-black text-indigo-600">
-                      ₹{(product.purchasePrice || product.sellingPrice || 0).toLocaleString('en-IN')}
+                    <div className="text-right">
+                      <div className="font-black text-indigo-600 text-sm">
+                        ₹{(product.purchasePrice || product.sellingPrice || 0).toLocaleString('en-IN')}
+                      </div>
+                      <div className="text-[10px] text-slate-400 font-semibold">
+                        {['INCLUSIVE', 'GST_INCLUSIVE', 'INCL', 'TRUE'].includes(String(product.taxType || product.taxMode || '').toUpperCase()) || product.isTaxInclusive ? 'Tax Incl.' : 'Tax Excl.'}
+                      </div>
                     </div>
                   </div>
-                ));
-              })()}
+                ))
+              )}
             </div>
           )}
         </div>
@@ -244,16 +281,29 @@ const PurchaseItemsTable = ({
                     />
                   </td>
 
-                  <td className="py-3.5 px-3">
+                  <td className="py-3.5 px-3 space-y-1">
                     <select
                       value={item.taxRate ?? item.taxPercent ?? 18}
                       onChange={(e) => onItemChange(idx, 'taxRate', parseFloat(e.target.value) || 0)}
                       className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 focus:bg-white focus:outline-none cursor-pointer"
                     >
-                      <option value="18">18%</option>
-                      <option value="12">12%</option>
-                      <option value="5">5%</option>
-                      <option value="0">0%</option>
+                      <option value="18">18% GST</option>
+                      <option value="12">12% GST</option>
+                      <option value="5">5% GST</option>
+                      <option value="0">0% GST</option>
+                    </select>
+
+                    <select
+                      value={(item.taxMode || 'EXCLUSIVE').toUpperCase()}
+                      onChange={(e) => onItemChange(idx, 'taxMode', e.target.value)}
+                      className={`w-full px-1.5 py-0.5 border rounded text-[10px] font-black cursor-pointer ${
+                        (item.taxMode || '').toUpperCase() === 'INCLUSIVE'
+                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300'
+                          : 'bg-slate-100 text-slate-700 border-slate-300'
+                      }`}
+                    >
+                      <option value="EXCLUSIVE">Excl.</option>
+                      <option value="INCLUSIVE">Incl.</option>
                     </select>
                   </td>
 

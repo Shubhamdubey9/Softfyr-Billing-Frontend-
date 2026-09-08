@@ -32,6 +32,20 @@ const getProductImageUrl = (prod) => {
   return imgSrc;
 };
 
+const getProductStock = (prod) => {
+  return Number(prod.currentStock ?? prod.stock ?? prod.qty ?? prod.openingStock ?? 0);
+};
+
+const getProductPurchasePrice = (prod) => {
+  return Number(prod.purchasePrice ?? prod.buyingPrice ?? prod.price ?? 0);
+};
+
+const getProductMinAlert = (prod) => {
+  if (!prod) return 5;
+  const val = Number(prod.minStockLevel || prod.stockAlertQuantity || prod.minStock || prod.lowStockThreshold);
+  return (val && val > 0) ? val : 5;
+};
+
 const getProductTax = (prod) => {
   return prod.taxPercent ?? prod.taxRate ?? prod.tax?.percentage ?? (prod.taxType === 'EXEMPT' || prod.taxType === 'NON_GST' ? 0 : 18);
 };
@@ -58,14 +72,19 @@ const ProductsListPage = () => {
 
   // Queries
   const { data: categoryRes } = useCategoriesQuery();
+
+  const isSpecialStockFilter = statusFilter === 'LOW_STOCK' || statusFilter === 'OUT_OF_STOCK';
+  const backendStatus = (statusFilter === 'ACTIVE' || statusFilter === 'INACTIVE') ? statusFilter : undefined;
+  const fetchLimit = isSpecialStockFilter ? 1000 : pageSize;
+
   const { data: responseData, isLoading } = useProductsQuery({
     search: searchQuery,
     category: categoryFilter !== 'ALL' ? categoryFilter : undefined,
     subCategory: subCategoryFilter !== 'ALL' ? subCategoryFilter : undefined,
     brand: brandFilter !== 'ALL' ? brandFilter : undefined,
-    status: statusFilter !== 'ALL' ? statusFilter : undefined,
-    page: currentPage,
-    limit: pageSize,
+    status: backendStatus,
+    page: isSpecialStockFilter ? 1 : currentPage,
+    limit: fetchLimit,
   });
 
   const deleteProductMutation = useDeleteProductMutation();
@@ -85,9 +104,13 @@ const ProductsListPage = () => {
     ? responseData.products
     : Array.isArray(responseData?.data?.products)
       ? responseData.data.products
-      : Array.isArray(responseData?.data)
-        ? responseData.data
-        : [];
+      : Array.isArray(responseData?.data?.items)
+        ? responseData.data.items
+        : Array.isArray(responseData?.items)
+          ? responseData.items
+          : Array.isArray(responseData?.data)
+            ? responseData.data
+            : [];
 
   const allProducts = rawProducts;
 
@@ -118,15 +141,21 @@ const ProductsListPage = () => {
     }
 
     if (statusFilter !== 'ALL') {
-      const stock = Number(prod.currentStock) || 0;
-      if (statusFilter === 'ACTIVE' && String(prod.status).toUpperCase() !== 'ACTIVE') return false;
-      if (statusFilter === 'INACTIVE' && String(prod.status).toUpperCase() !== 'INACTIVE') return false;
-      if (statusFilter === 'LOW_STOCK' && (stock === 0 || stock > 10)) return false;
-      if (statusFilter === 'OUT_OF_STOCK' && stock > 0) return false;
+      const stock = getProductStock(prod);
+      const minAlert = getProductMinAlert(prod);
+      const statusStr = String(prod.status || '').toUpperCase();
+      if (statusFilter === 'ACTIVE' && statusStr !== 'ACTIVE') return false;
+      if (statusFilter === 'INACTIVE' && statusStr !== 'INACTIVE') return false;
+      if (statusFilter === 'LOW_STOCK' && (stock === 0 || stock > minAlert) && statusStr !== 'LOW_STOCK') return false;
+      if (statusFilter === 'OUT_OF_STOCK' && stock > 0 && statusStr !== 'OUT_OF_STOCK') return false;
     }
 
     return true;
   });
+
+  const displayProducts = isSpecialStockFilter
+    ? filteredProducts.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    : filteredProducts;
 
   const pagination = responseData?.pagination || responseData?.data?.pagination || {
     total: filteredProducts.length,
@@ -137,11 +166,24 @@ const ProductsListPage = () => {
 
   const summary = responseData?.summary || responseData?.data?.summary || {};
 
-  // KPI Metrics
-  const totalProducts = summary.totalProducts ?? allProducts.length;
-  const lowStockCount = summary.lowStockCount ?? allProducts.filter((p) => (p.currentStock > 0 && p.currentStock <= 10) || p.status === 'LOW_STOCK').length;
-  const outOfStockCount = summary.outOfStockCount ?? allProducts.filter((p) => p.currentStock === 0 || p.status === 'OUT_OF_STOCK').length;
-  const totalStockValue = summary.totalStockValue ?? allProducts.reduce((acc, p) => acc + (p.currentStock || 0) * (p.purchasePrice || 0), 0);
+  // KPI Metrics with bulletproof key resolution & fallbacks
+  const totalProducts = summary.totalProducts ?? (pagination.total || allProducts.length);
+  const lowStockCount = allProducts.filter((p) => {
+    const stock = getProductStock(p);
+    const minAlert = getProductMinAlert(p);
+    const statusStr = String(p.status || '').toUpperCase();
+    return (stock > 0 && stock <= minAlert) || statusStr === 'LOW_STOCK';
+  }).length;
+
+  const outOfStockCount = allProducts.filter((p) => {
+    const stock = getProductStock(p);
+    const statusStr = String(p.status || '').toUpperCase();
+    return stock === 0 || statusStr === 'OUT_OF_STOCK';
+  }).length;
+
+  const totalStockValue = summary.totalStockValue ?? allProducts.reduce((acc, p) => {
+    return acc + getProductStock(p) * getProductPurchasePrice(p);
+  }, 0);
 
   const handleExport = async (format = 'csv') => {
     try {
@@ -200,8 +242,9 @@ const ProductsListPage = () => {
   };
 
   const getStatusBadge = (prod) => {
-    const stock = Number(prod.currentStock) || 0;
-    const status = String(prod.status).toUpperCase();
+    const stock = getProductStock(prod);
+    const minAlert = getProductMinAlert(prod);
+    const status = String(prod.status || '').toUpperCase();
 
     if (stock === 0 || status === 'OUT_OF_STOCK') {
       return (
@@ -210,7 +253,7 @@ const ProductsListPage = () => {
         </span>
       );
     }
-    if (stock <= 10 || status === 'LOW_STOCK') {
+    if ((stock > 0 && stock <= minAlert) || status === 'LOW_STOCK') {
       return (
         <span className="inline-block whitespace-nowrap px-2.5 py-0.5 bg-amber-50 text-amber-700 font-extrabold text-[11px] rounded-full border border-amber-200">
           Low Stock
@@ -278,8 +321,23 @@ const ProductsListPage = () => {
         lowStockCount={lowStockCount}
         outOfStockCount={outOfStockCount}
         totalStockValue={totalStockValue}
-        onFilterLowStock={() => setStatusFilter('LOW_STOCK')}
-        onFilterOutOfStock={() => setStatusFilter('OUT_OF_STOCK')}
+        currentStatusFilter={statusFilter}
+        onFilterAll={() => {
+          setStatusFilter('ALL');
+          setCurrentPage(1);
+        }}
+        onFilterLowStock={() => {
+          setStatusFilter('LOW_STOCK');
+          setCurrentPage(1);
+        }}
+        onFilterOutOfStock={() => {
+          setStatusFilter('OUT_OF_STOCK');
+          setCurrentPage(1);
+        }}
+        onFilterStockValue={() => {
+          setStatusFilter('ALL');
+          setCurrentPage(1);
+        }}
       />
 
       {/* Filter & Search Bar */}
@@ -359,11 +417,12 @@ const ProductsListPage = () => {
                   </td>
                 </tr>
               ) : (
-                filteredProducts.map((prod, idx) => {
+                displayProducts.map((prod, idx) => {
                   const categoryName = prod.category?.name || prod.categoryName || 'General';
-                  const purchasePrice = Number(prod.purchasePrice) || 0;
+                  const purchasePrice = getProductPurchasePrice(prod);
                   const sellingPrice = Number(prod.sellingPrice) || 0;
-                  const stock = Number(prod.currentStock) || 0;
+                  const stock = getProductStock(prod);
+                  const minAlert = getProductMinAlert(prod);
                   const tax = getProductTax(prod);
                   const imgSrc = getProductImageUrl(prod);
                   const targetProdId = prod.id || prod._id;
@@ -412,7 +471,7 @@ const ProductsListPage = () => {
                       <td className="py-4 px-4 font-bold text-slate-800 whitespace-nowrap">{formatCurrency(purchasePrice)}</td>
                       <td className="py-4 px-4 font-black text-slate-900 whitespace-nowrap">{formatCurrency(sellingPrice)}</td>
                       <td className="py-4 px-4 text-center">
-                        <span className={`font-black text-sm ${stock === 0 ? 'text-rose-600' : (stock <= 10 ? 'text-amber-600' : 'text-emerald-600')}`}>
+                        <span className={`font-black text-sm ${stock === 0 ? 'text-rose-600' : (stock <= minAlert ? 'text-amber-600' : 'text-emerald-600')}`}>
                           {stock}
                         </span>
                       </td>

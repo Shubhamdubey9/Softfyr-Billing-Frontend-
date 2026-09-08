@@ -35,18 +35,22 @@ const CreatePurchaseBillPage = () => {
   const suppliers = Array.isArray(supplierRes?.suppliers)
     ? supplierRes.suppliers
     : Array.isArray(supplierRes?.data?.suppliers)
-    ? supplierRes.data.suppliers
-    : Array.isArray(supplierRes?.data)
-    ? supplierRes.data
-    : [];
+      ? supplierRes.data.suppliers
+      : Array.isArray(supplierRes?.data)
+        ? supplierRes.data
+        : [];
 
   const products = Array.isArray(productRes?.products)
     ? productRes.products
     : Array.isArray(productRes?.data?.products)
-    ? productRes.data.products
-    : Array.isArray(productRes?.data)
-    ? productRes.data
-    : [];
+      ? productRes.data.products
+      : Array.isArray(productRes?.data?.items)
+        ? productRes.data.items
+        : Array.isArray(productRes?.items)
+          ? productRes.items
+          : Array.isArray(productRes?.data)
+            ? productRes.data
+            : [];
 
   // Supplier & Bill State
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -171,14 +175,14 @@ const CreatePurchaseBillPage = () => {
     if (!product) return;
     const isMultiUnit = Boolean(product.hasSecondaryUnit && product.secondaryUnit);
     const chosenUnit = isMultiUnit ? product.secondaryUnit : (product.unit || 'Nos');
-    const pPrice = isMultiUnit && product.secondaryPurchasePrice 
-      ? Number(product.secondaryPurchasePrice) 
+    const pPrice = isMultiUnit && product.secondaryPurchasePrice
+      ? Number(product.secondaryPurchasePrice)
       : (Number(product.purchasePrice) || Number(product.sellingPrice) || 0);
 
     const rawTaxType = (product.taxType || product.taxMode || '').toUpperCase();
     const isExemptOrNonGst = rawTaxType === 'EXEMPT' || rawTaxType === 'NON_GST' || rawTaxType === 'EXEMPTED';
-    const tax = isExemptOrNonGst 
-      ? 0 
+    const tax = isExemptOrNonGst
+      ? 0
       : Number(product.taxPercent ?? product.taxRate ?? product.tax?.percentage ?? 18);
 
     const isInclusive = ['INCLUSIVE', 'GST_INCLUSIVE'].includes(rawTaxType) || (product.taxMode || '').toUpperCase() === 'INCLUSIVE';
@@ -220,14 +224,14 @@ const CreatePurchaseBillPage = () => {
 
     const isMultiUnit = Boolean(selectedProd.hasSecondaryUnit && selectedProd.secondaryUnit);
     const chosenUnit = isMultiUnit ? selectedProd.secondaryUnit : (selectedProd.unit || 'Nos');
-    const pPrice = isMultiUnit && selectedProd.secondaryPurchasePrice 
-      ? Number(selectedProd.secondaryPurchasePrice) 
+    const pPrice = isMultiUnit && selectedProd.secondaryPurchasePrice
+      ? Number(selectedProd.secondaryPurchasePrice)
       : (Number(selectedProd.purchasePrice) || Number(selectedProd.sellingPrice) || 0);
 
     const rawTaxType = (selectedProd.taxType || selectedProd.taxMode || '').toUpperCase();
     const isExemptOrNonGst = rawTaxType === 'EXEMPT' || rawTaxType === 'NON_GST' || rawTaxType === 'EXEMPTED';
-    const tax = isExemptOrNonGst 
-      ? 0 
+    const tax = isExemptOrNonGst
+      ? 0
       : Number(selectedProd.taxPercent ?? selectedProd.taxRate ?? selectedProd.tax?.percentage ?? 18);
 
     const isInclusive = ['INCLUSIVE', 'GST_INCLUSIVE'].includes(rawTaxType) || (selectedProd.taxMode || '').toUpperCase() === 'INCLUSIVE';
@@ -316,10 +320,10 @@ const CreatePurchaseBillPage = () => {
   // Load Existing Bill Data in Edit Mode
   useEffect(() => {
     if (isEditMode && billDetailsRes) {
-      const b = billDetailsRes?.data?.purchaseInvoice 
-        || billDetailsRes?.data?.purchase 
-        || billDetailsRes?.data 
-        || billDetailsRes?.purchase 
+      const b = billDetailsRes?.data?.purchaseInvoice
+        || billDetailsRes?.data?.purchase
+        || billDetailsRes?.data
+        || billDetailsRes?.purchase
         || billDetailsRes?.bill;
 
       if (b) {
@@ -349,7 +353,7 @@ const CreatePurchaseBillPage = () => {
             const itemTaxMode = (i.taxMode || i.taxType || i.product?.taxMode || i.product?.taxType || 'EXCLUSIVE').toUpperCase() === 'INCLUSIVE' ? 'INCLUSIVE' : 'EXCLUSIVE';
             const itemObj = {
               id: i.id || idx + 1,
-              productId: i.productId || i.product?.id || `prod-${idx+1}`,
+              productId: i.productId || i.product?.id || `prod-${idx + 1}`,
               name: i.product?.name || i.name || 'Purchase Item',
               description: i.product?.description || i.description || '',
               sku: i.product?.sku || i.sku || 'N/A',
@@ -417,6 +421,8 @@ const CreatePurchaseBillPage = () => {
         discountPercent: Number(i.discountPercent) || 0,
         taxPercent: Number(i.taxRate) || 18,
         taxMode: i.taxMode || 'EXCLUSIVE',
+        taxType: i.taxMode || 'EXCLUSIVE',
+        isTaxInclusive: (i.taxMode || '').toUpperCase() === 'INCLUSIVE',
       })),
     };
 

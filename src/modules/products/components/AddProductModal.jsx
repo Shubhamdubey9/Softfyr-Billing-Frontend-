@@ -5,7 +5,8 @@ import {
   Tag,
   IndianRupee,
   CheckCircle2,
-  Loader2
+  Loader2,
+  Settings,
 } from 'lucide-react';
 import { useCreateProductMutation, useCategoriesQuery } from '../hooks/useProductsQueries';
 import { useToast } from '../../../context/ToastContext';
@@ -22,10 +23,10 @@ const AddProductModal = ({ isOpen, onClose, onSaveProduct, toast: toastProp }) =
   const categories = Array.isArray(categoryRes?.categories)
     ? categoryRes.categories
     : Array.isArray(categoryRes?.data?.categories)
-    ? categoryRes.data.categories
-    : Array.isArray(categoryRes?.data)
-    ? categoryRes.data
-    : [];
+      ? categoryRes.data.categories
+      : Array.isArray(categoryRes?.data)
+        ? categoryRes.data
+        : [];
 
   const [formData, setFormData] = useState({
     name: '',
@@ -93,8 +94,10 @@ const AddProductModal = ({ isOpen, onClose, onSaveProduct, toast: toastProp }) =
       unit: formData.unit,
       description: formData.description,
       taxPercent: parseFloat(formData.taxPercent || '18'),
+      taxRate: parseFloat(formData.taxPercent || '18'),
       taxType: formData.taxMode || 'INCLUSIVE',
       taxMode: formData.taxMode || 'INCLUSIVE',
+      isTaxInclusive: formData.taxMode === 'INCLUSIVE',
       status: 'ACTIVE'
     };
 
@@ -152,11 +155,63 @@ const AddProductModal = ({ isOpen, onClose, onSaveProduct, toast: toastProp }) =
             />
           </div>
 
-          {/* SKU, Category & Brand */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* SKU, HSN, Category & Brand */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  SKU
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    let prefix = 'SKU';
+                    if (formData.name && formData.name.trim()) {
+                      const words = formData.name.trim().split(/\s+/);
+                      const initials = words.map(w => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+                      if (initials.length >= 2) prefix = `SKU-${initials}`;
+                    }
+                    const randomNum = Math.floor(100000 + Math.random() * 900000);
+                    handleChange('sku', `${prefix}-${randomNum}`);
+                  }}
+                  className="text-[10px] text-indigo-600 font-extrabold hover:underline flex items-center gap-0.5 cursor-pointer"
+                  title="Auto Generate SKU"
+                >
+                  <Settings size={12} />
+                  <span>Auto</span>
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.sku || ''}
+                  onChange={(e) => handleChange('sku', e.target.value)}
+                  placeholder="SKU"
+                  className="w-full pl-3 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:bg-white focus:border-indigo-600 outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    let prefix = 'SKU';
+                    if (formData.name && formData.name.trim()) {
+                      const words = formData.name.trim().split(/\s+/);
+                      const initials = words.map(w => w[0]).join('').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 3);
+                      if (initials.length >= 2) prefix = `SKU-${initials}`;
+                    }
+                    const randomNum = Math.floor(100000 + Math.random() * 900000);
+                    handleChange('sku', `${prefix}-${randomNum}`);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
+                  title="Auto Generate SKU"
+                >
+                  <Settings size={14} />
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
-                HSN / SAC Code <span className="text-rose-500">*</span>
+                HSN / SAC <span className="text-rose-500">*</span>
               </label>
               <input
                 type="text"
@@ -337,11 +392,10 @@ const AddProductModal = ({ isOpen, onClose, onSaveProduct, toast: toastProp }) =
                     key={rate}
                     type="button"
                     onClick={() => handleChange('taxPercent', rate.toString())}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${
-                      Number(formData.taxPercent) === rate
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold border transition-all cursor-pointer ${Number(formData.taxPercent) === rate
                         ? 'bg-indigo-600 text-white border-indigo-600'
                         : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-200'
-                    }`}
+                      }`}
                   >
                     {rate}%
                   </button>
@@ -356,11 +410,10 @@ const AddProductModal = ({ isOpen, onClose, onSaveProduct, toast: toastProp }) =
               <div className="grid grid-cols-2 gap-3">
                 <label
                   onClick={() => handleChange('taxMode', 'INCLUSIVE')}
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                    formData.taxMode === 'INCLUSIVE'
+                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${formData.taxMode === 'INCLUSIVE'
                       ? 'bg-indigo-50/70 border-indigo-600 text-indigo-950 font-extrabold shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 font-semibold'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"
@@ -378,11 +431,10 @@ const AddProductModal = ({ isOpen, onClose, onSaveProduct, toast: toastProp }) =
 
                 <label
                   onClick={() => handleChange('taxMode', 'EXCLUSIVE')}
-                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${
-                    formData.taxMode === 'EXCLUSIVE'
+                  className={`flex items-center gap-2 p-2.5 rounded-xl border-2 cursor-pointer transition-all ${formData.taxMode === 'EXCLUSIVE'
                       ? 'bg-indigo-50/70 border-indigo-600 text-indigo-950 font-extrabold shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 font-semibold'
-                  }`}
+                    }`}
                 >
                   <input
                     type="radio"

@@ -14,6 +14,12 @@ import AdjustStockModal from '../components/AdjustStockModal';
 import StatusBadge from '../../../components/common/StatusBadge';
 import { useToast } from '../../../context/ToastContext';
 
+const getItemMinAlert = (item) => {
+  if (!item) return 5;
+  const alertVal = item.minStockLevel ?? item.stockAlertQuantity ?? item.minStock ?? item.lowStockThreshold ?? 5;
+  return Number(alertVal) || 5;
+};
+
 const InventoryListPage = () => {
   const toast = useToast();
   const { data: rawInventory, isLoading, refetch } = useInventoryQuery();
@@ -23,8 +29,14 @@ const InventoryListPage = () => {
 
   const inventoryItems = Array.isArray(rawInventory)
     ? rawInventory
+    : Array.isArray(rawInventory?.data?.items)
+    ? rawInventory.data.items
     : Array.isArray(rawInventory?.items)
     ? rawInventory.items
+    : Array.isArray(rawInventory?.data?.products)
+    ? rawInventory.data.products
+    : Array.isArray(rawInventory?.data)
+    ? rawInventory.data
     : [];
 
   const filteredItems = inventoryItems.filter((item) => {
@@ -35,7 +47,7 @@ const InventoryListPage = () => {
       sku.toLowerCase().includes(searchQuery.toLowerCase());
 
     const qty = item.qty !== undefined ? item.qty : (item.stock !== undefined ? item.stock : 0);
-    const minStock = item.minStock || 10;
+    const minStock = getItemMinAlert(item);
     const isLowStock = qty <= minStock || item.status === 'Low Stock';
 
     const matchesFilter = filterType === 'ALL' || (filterType === 'LOW_STOCK' && isLowStock);
@@ -45,7 +57,7 @@ const InventoryListPage = () => {
 
   const lowStockCount = inventoryItems.filter((item) => {
     const qty = item.qty !== undefined ? item.qty : (item.stock !== undefined ? item.stock : 0);
-    const minStock = item.minStock || 10;
+    const minStock = getItemMinAlert(item);
     return qty <= minStock || item.status === 'Low Stock';
   }).length;
 
@@ -176,7 +188,7 @@ const InventoryListPage = () => {
               ) : (
                 filteredItems.map((item) => {
                   const qty = item.qty !== undefined ? item.qty : (item.stock !== undefined ? item.stock : 0);
-                  const minStock = item.minStock || 10;
+                  const minStock = getItemMinAlert(item);
                   const isLow = qty <= minStock || item.status === 'Low Stock';
                   const percent = Math.min(100, Math.round((qty / (minStock * 3)) * 100));
 
