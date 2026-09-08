@@ -25,8 +25,8 @@ import ProductDeleteModal from '../components/ProductDeleteModal';
 const getProductImageUrl = (prod) => {
   let imgSrc = prod.imageUrl || prod.productImage || prod.image || prod.thumbnail || prod.photo || prod.img || null;
   if (imgSrc && typeof imgSrc === 'string' && !imgSrc.startsWith('http') && !imgSrc.startsWith('data:')) {
-    const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-    const baseUrl = apiBase.replace(/\/api\/?$/, '');
+    const apiBase = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+    const baseUrl = apiBase.replace(/\/api(\/v\d+)?\/?$/, '');
     return `${baseUrl}/${imgSrc.replace(/^\//, '')}`;
   }
   return imgSrc;
