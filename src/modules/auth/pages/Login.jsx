@@ -9,25 +9,16 @@ import {
   useAdminLoginMutation
 } from '../hooks/useAuthQueries';
 import {
-  useCreateProfileStep1Mutation,
-  useCreateProfileStep2Mutation
-} from '../../onboarding/hooks/useOnboardingQueries';
-import {
   validateAdminLogin,
   validateSendOtp,
   validateVerifyOtp
 } from '../validators/authValidators';
-import { DEFAULT_PROFILE_MOCK_DATA } from '../data/authMockData';
 import { IndianRupee, ShieldCheck } from 'lucide-react';
 import { handlePostLoginRedirect } from '../../../utils/navigation';
-
 import PortalSwitcher from '../components/PortalSwitcher';
 import AuthHeroPanel from '../components/AuthHeroPanel';
 import AdminLoginForm from '../components/AdminLoginForm';
 import { VendorMobileForm, VendorOtpVerifyForm } from '../components/VendorOtpForms';
-import VendorProfileStep1Form from '../../onboarding/components/VendorProfileStep1Form';
-import VendorProfileStep2Form from '../../onboarding/components/VendorProfileStep2Form';
-import VendorPackageSelectionForm from '../../onboarding/components/VendorPackageSelectionForm';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -222,29 +213,18 @@ const Login = () => {
         onError: (err) => {
           const apiMsg = err?.response?.data?.message;
 
-          // Only proceed if demo OTP '123456' is entered, otherwise show Invalid OTP error
+          // If demo OTP '123456' is entered or when in offline demo mode:
           if (fullOtp === '123456') {
-            if (mobileNumber === '9876543210') {
-              const existingVendor = {
-                id: 'vendor-1',
-                name: 'Apex Store Admin',
-                mobileNumber,
-                role: 'TENANT_ADMIN',
-                tenant: { businessName: 'Apex Retail Superstore Jaipur', category: 'RETAIL' }
-              };
-              login(existingVendor, 'dummy-vendor-jwt-token');
-              toast.success('Welcome back Apex Store Admin! Access granted.');
-              navigate('/vendor/dashboard', { replace: true });
-            } else {
-              // All new or incomplete vendors MUST complete business profile creation
-              const dummyUser = { id: 'vendor-new', name: 'New Store Owner', mobileNumber, role: 'TENANT_ADMIN' };
-              setTempAuthToken('dummy-vendor-jwt-token');
-              setTempUserObj(dummyUser);
-              localStorage.setItem('token', 'dummy-vendor-jwt-token');
-              setProfileData((prev) => ({ ...prev, phone: mobileNumber }));
-              setVendorStage('PROFILE_STEP_1');
-              toast.info('OTP Verified! Create your 2-step store profile.');
-            }
+            const vendorUser = {
+              id: 'vendor-1',
+              name: 'Store Admin',
+              mobileNumber,
+              role: 'TENANT_ADMIN',
+              tenant: { businessName: 'Apex Store Admin', category: 'RETAIL' }
+            };
+            login(vendorUser, 'dummy-vendor-jwt-token');
+            toast.success('Welcome back Store Admin! Access granted.');
+            navigate('/vendor/dashboard', { replace: true });
           } else {
             // Wrong / Invalid OTP entered by user!
             const errorMsg = apiMsg || 'Invalid OTP code! Please enter valid 6-digit OTP (Demo OTP is 123456).';
@@ -254,95 +234,6 @@ const Login = () => {
         },
       }
     );
-  };
-
-  // Step 1 Submit handler: call backend /business/create-profile/step-1
-  const handleStep1Submit = () => {
-    setError('');
-    const step1Payload = {
-      businessName: profileData.businessName,
-      businessType: profileData.category || 'Retail Store',
-      businessLogo: profileData.businessLogo || '',
-      gstNumber: profileData.gstin || '',
-      email: profileData.email || '',
-      businessAddress: profileData.address || '',
-      city: profileData.city || '',
-      state: profileData.state || ''
-    };
-
-    createStep1Mutation.mutate(step1Payload, {
-      onSuccess: (resData) => {
-        toast.success('Step 1/2 complete: Business details & store logo saved! 🚀');
-        if (resData?.data) {
-          setTempUserObj((prev) => ({ ...prev, tenant: resData.data }));
-        }
-        setVendorStage('PROFILE_STEP_2');
-      },
-      onError: (err) => {
-        const msg = err?.response?.data?.message || 'Warning: Backend profile save failed.';
-        console.warn('Backend Step 1 warning:', msg);
-        toast.info('Step 1 saved (demo mode). Moving to branding config...');
-        setVendorStage('PROFILE_STEP_2');
-      }
-    });
-  };
-
-  // Step 2 Submit handler: call backend /business/create-profile/step-2
-  const handleStep2Submit = () => {
-    setError('');
-    const step2Payload = {
-      businessName: profileData.businessName,
-      businessAddress: profileData.address || '',
-      city: profileData.city || '',
-      state: profileData.state || '',
-      pincode: profileData.pincode || '',
-      gstNumber: profileData.gstin || '',
-      otherInvoiceInfo: profileData.invoiceTerms || 'Thank you for shopping with us!'
-    };
-
-    createStep2Mutation.mutate(step2Payload, {
-      onSuccess: (resData) => {
-        const payload = resData.data || resData;
-        toast.success('Step 2/2 complete: Invoice branding & terms configured! 📄');
-        if (payload?.hasSelectedPackage) {
-          const finalUser = { ...tempUserObj, tenant: payload };
-          login(finalUser, tempAuthToken || localStorage.getItem('token') || 'vendor-jwt-token');
-          toast.success(`Welcome to ${profileData.businessName}! Launching Dashboard...`);
-          navigate('/vendor/dashboard', { replace: true });
-        } else {
-          setVendorStage('PACKAGE_SELECT');
-        }
-      },
-      onError: (err) => {
-        const msg = err?.response?.data?.message || 'Warning: Backend Step 2 save failed.';
-        console.warn('Backend Step 2 warning:', msg);
-        toast.info('Branding saved (demo mode). Select a subscription plan...');
-        setVendorStage('PACKAGE_SELECT');
-      }
-    });
-  };
-
-  // Final step: Save package selection & redirect to dashboard
-  const handleFinalizeSetup = ({ selectedPlan, billingCycle }) => {
-    setIsFinalizing(true);
-    setTimeout(() => {
-      const finalUser = {
-        ...tempUserObj,
-        tenant: {
-          businessName: profileData.businessName,
-          category: profileData.category,
-          gstin: profileData.gstin,
-          invoicePrefix: profileData.invoicePrefix,
-          package: selectedPlan.name,
-          billingCycle
-        }
-      };
-
-      login(finalUser, tempAuthToken || 'vendor-jwt-token');
-      setIsFinalizing(false);
-      toast.success(`Store "${profileData.businessName}" created successfully! Launching Dashboard.`);
-      navigate('/vendor/dashboard', { replace: true });
-    }, 1000);
   };
 
   const handleAdminPasswordLogin = (e) => {
@@ -412,24 +303,14 @@ const Login = () => {
               <div className="text-xs font-bold text-indigo-600 tracking-wider uppercase mb-1">
                 {role === 'ADMIN'
                   ? 'Super Admin Portal'
-                  : vendorStage === 'PROFILE_STEP_1'
-                  ? 'Store Setup • Step 1 of 2'
-                  : vendorStage === 'PROFILE_STEP_2'
-                  ? 'Store Branding • Step 2 of 2'
-                  : vendorStage === 'PACKAGE_SELECT'
-                  ? 'Choose Subscription Plan'
+                  : vendorStage === 'OTP'
+                  ? 'Verify OTP'
                   : 'Vendor Store Portal'}
               </div>
 
               <h2 className="text-2xl font-extrabold text-slate-900">
                 {role === 'ADMIN'
                   ? 'Admin Direct Login'
-                  : vendorStage === 'PROFILE_STEP_1'
-                  ? 'Create Business Profile'
-                  : vendorStage === 'PROFILE_STEP_2'
-                  ? 'Configure Invoices & Tax'
-                  : vendorStage === 'PACKAGE_SELECT'
-                  ? 'Select Subscription Tier'
                   : vendorStage === 'OTP'
                   ? 'Verify OTP Code'
                   : 'Vendor OTP Login'}
@@ -438,12 +319,6 @@ const Login = () => {
               <p className="text-xs text-slate-500 mt-1">
                 {role === 'ADMIN'
                   ? 'Enter super admin credentials to access tenant management dashboard.'
-                  : vendorStage === 'PROFILE_STEP_1'
-                  ? 'Provide your business name, store category, and contact details.'
-                  : vendorStage === 'PROFILE_STEP_2'
-                  ? 'Set your invoice prefix, default tax rate, and receipt footer message.'
-                  : vendorStage === 'PACKAGE_SELECT'
-                  ? 'Select a plan to provision your isolated store partition.'
                   : vendorStage === 'OTP'
                   ? `Enter the 6-digit OTP code sent to +91 ${mobileNumber}`
                   : 'Enter your registered 10-digit mobile number to receive OTP.'}
@@ -475,7 +350,7 @@ const Login = () => {
                 onSubmit={handleSendOtp}
                 loading={loading}
               />
-            ) : vendorStage === 'OTP' ? (
+            ) : (
               <VendorOtpVerifyForm
                 otpDigits={otpDigits}
                 handleOtpChange={handleOtpChange}
@@ -486,28 +361,6 @@ const Login = () => {
                 resendTimer={resendTimer}
                 onResendOtp={handleResendOtp}
                 onChangeNumber={() => setVendorStage('MOBILE')}
-              />
-            ) : vendorStage === 'PROFILE_STEP_1' ? (
-              <VendorProfileStep1Form
-                profileData={profileData}
-                setProfileData={setProfileData}
-                onNext={handleStep1Submit}
-                onCancel={() => setVendorStage('OTP')}
-                loading={createStep1Mutation.isPending}
-              />
-            ) : vendorStage === 'PROFILE_STEP_2' ? (
-              <VendorProfileStep2Form
-                profileData={profileData}
-                setProfileData={setProfileData}
-                onNext={handleStep2Submit}
-                onBack={() => setVendorStage('PROFILE_STEP_1')}
-                loading={createStep2Mutation.isPending}
-              />
-            ) : (
-              <VendorPackageSelectionForm
-                onComplete={handleFinalizeSetup}
-                onBack={() => setVendorStage('PROFILE_STEP_2')}
-                loading={loading}
               />
             )}
           </div>

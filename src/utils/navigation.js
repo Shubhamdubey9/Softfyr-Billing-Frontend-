@@ -8,17 +8,17 @@ export const handlePostLoginRedirect = (verifyOtpResponse, navigate) => {
   const { isProfileComplete, profileStep, hasSelectedPackage, redirectUrl } = data;
 
   if (redirectUrl) {
-    navigate(redirectUrl);
-  } else if (!isProfileComplete) {
+    navigate(redirectUrl, { replace: true });
+  } else if (isProfileComplete === false) {
     if (profileStep === 2) {
-      navigate('/create-business-profile/step-2');
+      navigate('/create-business-profile/step-2', { replace: true });
     } else {
-      navigate('/create-business-profile/step-1');
+      navigate('/create-business-profile/step-1', { replace: true });
     }
-  } else if (!hasSelectedPackage) {
-    navigate('/choose-package');
+  } else if (hasSelectedPackage === false) {
+    navigate('/choose-package', { replace: true });
   } else {
-    navigate('/vendor/dashboard');
+    navigate('/vendor/dashboard', { replace: true });
   }
 };
 
