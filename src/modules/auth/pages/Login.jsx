@@ -82,10 +82,8 @@ const Login = () => {
   const verifyOtpMutation = useVerifyOtpMutation();
   const resendOtpMutation = useResendOtpMutation();
   const adminLoginMutation = useAdminLoginMutation();
-  const createStep1Mutation = useCreateProfileStep1Mutation();
-  const createStep2Mutation = useCreateProfileStep2Mutation();
 
-  const loading = sendOtpMutation.isPending || verifyOtpMutation.isPending || resendOtpMutation.isPending || adminLoginMutation.isPending || createStep1Mutation.isPending || createStep2Mutation.isPending || isFinalizing;
+  const loading = sendOtpMutation.isPending || verifyOtpMutation.isPending || resendOtpMutation.isPending || adminLoginMutation.isPending || isFinalizing;
 
   // Countdown timer for OTP resend
   useEffect(() => {
